@@ -15,6 +15,7 @@ library(lubridate)
 library(reshape2)
 library(MASS)
 library(dummies)
+library(ggplot2)
 ```
 
 ```{r, echo=F}
@@ -184,6 +185,7 @@ ds1.counter$post1 <- 0
 ds1.counter$post2 <- 0
 ds1.counter$post3 <- 0
 # View(ds1.counter)
+
 ds.mod1$pred.epc.cf <- predict(mod1.epc, type='response', newdata=ds1.counter) # newdata is now "ds1.counter"
 
 # Calculate a rate ratio (i.e., Ratio of model-fitted vs. counterfactual number of pneumonia cases)
@@ -325,24 +327,28 @@ time_points1 <- unique(ds1$date)
 
 # 5 models controllling for different sets of covariates
 # NOTE: all models control for seasonality (by monthly dummy variables) and population (offset)
-mod1a <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='pois', other.covars='none')
-mod1b <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='pois', other.covars='xray')
-mod1c <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='pois', other.covars=c('xray','time_index'))
-mod1d <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='pois', other.covars=c('bronchiol','time_index') )
-mod1e <- spline_func(ds=ds1,outcome_name='epc', denom='mppop',other.covars= c('xray'), mod='pois' )
+
+mod1a <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='negbin', other.covars='none')
+
+mod1b <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='negbin', other.covars='xray')
+
+mod1c <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='negbin', other.covars=c('xray','time_index'))
+
+mod1d <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='negbin', other.covars=c('bronchiol','time_index') )
+
+mod1e <- spline_func(ds=ds1,outcome_name='epc', denom='mppop',other.covars= c('xray'), mod='negbin' )
 
 # Extract results
 rr <- t(sapply(list(mod1a,mod1b, mod1c,mod1d,mod1e), '[[','rr.q.post'))
 rr
 aic <- t(sapply(list(mod1a,mod1b, mod1c,mod1d,mod1e), '[[','aic1'))
 aic
-dispersion <- t(sapply(list(mod1a,mod1b, mod1c,mod1d,mod1e), '[[','overdispersion'))
-dispersion
+#dispersion <- t(sapply(list(mod1a,mod1b, mod1c,mod1d,mod1e), '[[','overdispersion'))
+#dispersion
 ```
 
-This suggests that the best model by AIC adjusts for XRays. 
+This suggests that the best model by AIC adjusts for XRays. Models 1b,c,e are similar by AIC, all give similar RR estimates We are using a negative binomial model here
 
-The dispersion tells us whether the Poisson model is appropriate. If numbers close to 1, then stick with Poisson. If it is >>1, then go with negative binimoal (change to mod='negbin' in the function). In this instance it doesn't make a big difference (get slightly wider CIs with negative binomial).
 
 
 ```{r}
@@ -364,7 +370,7 @@ dispersion <- t(sapply(list(mod2a,mod2b, mod2c,mod2d,mod2e), '[[','overdispersio
 dispersion
 ```
 
-Suggests best model is the one that adjusts for pneumococcal pneumonia (pcv13st is a subset of pneumococcal pneumonia). So we are effectively testing whether pneumonia caused by PCV13 serotypes declines in relation to the overall change in pneumococcal pneumonia. We can stick with Poisson here.
+Model E does best--adjusts for pneumococcal pneumonia (pcv13st is a subset of pneumococcal pneumonia). So we are effectively testing whether pneumonia caused by PCV13 serotypes declines in relation to the overall change in pneumococcal pneumonia. We can stick with Poisson model here.
 
 
 ```{r}
@@ -372,10 +378,10 @@ Suggests best model is the one that adjusts for pneumococcal pneumonia (pcv13st 
 # spnpneumonia (Pneumococcal pneumonia)
 #-----*-----*-----*-----*-----*-----*-----*-----*-----#
 
-mod3a <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='pois')
-mod3b <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='pois', other.covars='xray' )
-mod3c <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='pois', other.covars= c('time_index'))
-mod3d <- spline_func(ds=ds1,outcome_name='spnpneumonia', denom='mppop', mod='pois', other.covars= c('xray'))
+mod3a <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='negbin')
+mod3b <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='negbin', other.covars='xray' )
+mod3c <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='negbin', other.covars= c('time_index'))
+mod3d <- spline_func(ds=ds1,outcome_name='spnpneumonia', denom='mppop', mod='negbin', other.covars= c('xray'))
 
 rr <- t(sapply(list(mod3a,mod3b, mod3c,mod3d), '[[','rr.q.post'))
 rr
@@ -393,10 +399,10 @@ mod3c and mod3d are the best models.
 # clpnhypox (Hypoxic pneumonia)
 #-----*-----*-----*-----*-----*-----*-----*-----*-----#
 
-mod4a<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='pois')
-mod4b<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='pois', other.covars='xray')
-mod4c<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='pois', other.covars='time_index')
-mod4d<-spline_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='pois', other.covars='xray')
+mod4a<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='negbin')
+mod4b<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='negbin', other.covars='xray')
+mod4c<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='negbin', other.covars='time_index')
+mod4d<-spline_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='negbin', other.covars='xray')
 
 rr<-t(sapply(list(mod4a, mod4b, mod4c, mod4d), '[[','rr.q.post'))
 rr
@@ -405,9 +411,7 @@ aic
 dispersion<-t(sapply(list(mod4a,mod4b, mod4c,mod4d), '[[','overdispersion'))
 dispersion
 ```
-
-The spline model, which connects post-vaccine periods with connected line sgements is the best. 
-
+4d: Spline model adjusting for xrays best
 
 ```{r}
 #-----*-----*-----*-----*-----*-----*-----*-----*-----#
@@ -427,7 +431,7 @@ dispersion<-t(sapply(list(mod5a,mod5b, mod5c,mod5d), '[[','overdispersion'))
 dispersion
 ```
 
-Best model adjusts for Xrays and uses linear splines to connect post vaccine periods. The best model is not overdiserpsed, so stick with Poisson. (mod5a and mod5c are clearly overdispersed, so we can try negative binomial.)
+Best model adjusts for Xrays and uses spline functions to connect post vaccine periods. The best model is not overdiserpsed, so stick with Poisson. (mod5a and mod5c are clearly overdispersed, so we can try negative binomial.)
 
 ## RRs by the best model for each outcome
 
@@ -435,7 +439,7 @@ Select the best model (by AIC) for each of these. We are going to ignore the mod
 
 ```{r}
 # Select the best model for each outcome
-best.models <- list(mod1e, mod2e, mod3d, mod4d, mod5d)
+best.models <- list(mod1e, mod2e, mod3d, mod4b, mod5b)
 
 # Create a table of RRs generated by the "best" model
 rr.all <- round(t(sapply(best.models, '[[','rr.q.post')),2)
