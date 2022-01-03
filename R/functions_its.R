@@ -22,7 +22,11 @@ step_func <- function(ds,
   ds$sin6<-sin(2*pi* ds$time_index/6)
   ds$cos6<-cos(2*pi* ds$time_index/6)
   ds$month<-month(ds$date)
-  month.dummies<-as.data.frame(dummies::dummy(ds$month))[,1:11]
+  #month.dummies<-as.data.frame(dummies::dummy(ds$month))[,1:11]
+  month.dummies <- model.matrix(~ as.factor(month), data=ds)
+  month.dummies <- as.data.frame(month.dummies[,-1])
+  names(month.dummies) <- paste0('month', 2:(ncol(month.dummies)+1))
+  
   ds$one<-1
   ds<-cbind.data.frame(ds, month.dummies)
   
@@ -63,6 +67,7 @@ step_func <- function(ds,
   deviance1<-summary(mod1)$deviance
   df1<-summary(mod1)$df[2]
   overdispersion<-deviance1/df1
+  
   #GENERATE PREDICTIONS
   covars3 <-
     as.matrix(cbind(ds[, mod.vars])) 
@@ -150,7 +155,13 @@ spline_func <- function(ds,
   ds$sin6<-sin(2*pi* ds$time_index/6)
   ds$cos6<-cos(2*pi* ds$time_index/6)
   ds$month<-month(ds$date)
-  month.dummies<-as.data.frame(dummies::dummy(ds$month))[,1:11]
+ # month.dummies<-as.data.frame(dummies::dummy(ds$month))[,1:11]
+  
+  #month.dummies<-as.data.frame(dummies::dummy(ds$month))[,1:11]
+  month.dummies <- model.matrix(~ as.factor(month), data=ds)
+  month.dummies <- as.data.frame(month.dummies[,-1])
+  names(month.dummies) <- paste0('month', 2:(ncol(month.dummies)+1))
+  
   ds$one<-1
   ds<-cbind.data.frame(ds, month.dummies)
   
