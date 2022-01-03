@@ -8,13 +8,14 @@ output:
   word_document: default
 ---
 
-```{r}
+```{r, setup}
 library(zoo)
 library(lme4)
 library(lubridate)
 library(reshape2)
 library(MASS)
 library(dummies)
+library(ggplot2)
 ```
 
 ```{r, echo=F}
@@ -52,9 +53,14 @@ We are working with monthly time series data for children <5 years of age captur
 Save the .csv file in the same directory as this .Rmd file, then read it in using the code below.
 
 ```{r}
- ds1<- read.csv('./Data/gambia_u5.csv') # or
+ds1<- read.csv('./Data/gambia_u5.csv') # or
 names(ds1)
 str(ds1)
+```
+
+Declare the date variable as a date
+```{r}
+ds1$date <- as.Date(ds1$date)
 ```
 
 Dictionary: 
@@ -73,32 +79,40 @@ Dictionary:
 
 Let's first look at time series plots for various definitions of pneumonia.
 
-```{r, fig.width=8, fig.height=5}
-# Date variable
-ds1$date <- as.Date(ds1$date)
-ds1 <- ds1[order(ds1$date),] # Sort by date
-summary(ds1$date)
+The easiest way to do this is to reshape the data into a 'long' format and then use facet wrapping with ggplot2
 
-# Various levels of specificity for pneumococcus
-par(mfrow=c(2,2))
-plot(spnpneumonia ~ date, data=ds1, type="l", col="red", bty="l", main="Pneumococcal pneumonia", ylab="Counts")
-abline(v=as.Date(c('2009-08-01','2012-05-01')), lty=2) # PCV7 and PCV13 introductions
-plot(epc ~ date, data=ds1, type="l", col="blue", bty="l", main="X-ray confirmed pneumonia", ylab="Counts")
-abline(v=as.Date(c('2009-08-01','2012-05-01')), lty=2)
-plot(clpnhypox ~ date, data=ds1, type="l", col="orange", bty="l", main="Hypoxic pneumonia", ylab="Counts")
-abline(v=as.Date(c('2009-08-01','2012-05-01')), lty=2)
-plot(clpneumonia ~ date, data=ds1, type="l", col="black", bty="l", main="Clinical pneumonia", ylab="Counts")
-abline(v=as.Date(c('2009-08-01','2012-05-01')), lty=2)
+first reshape the data
+```{r}
+ds1.m <- reshape2::melt(ds1[,c('date','spnpneumonia','epc','clpnhypox','clpneumonia')], id.vars=c('date'))
 
-# All in one plot
-par(mfrow=c(1,1))
-plot(clpneumonia ~ date, data=ds1, type="l", col="black", bty="l", main="Various definitions of pneumonia", ylab="Counts", ylim=c(0,max(clpneumonia)))
-lines(epc ~ date, data=ds1, col="blue")
-lines(clpnhypox ~ date, data=ds1, col="orange")
-lines(spnpneumonia ~ date, data=ds1, col="red")
-legend(x="topright",legend = c("Clinical","X-ray","Hypoxic","Pneumococcal"), lty=c(1,1,1,1), col=c("black","blue","orange","red"), bty="n", cex=0.8)
-abline(v=as.Date(c('2009-08-01','2012-05-01')), lty=2)
 ```
+
+All on the same plot
+```{r}
+p1 <- ggplot(ds1.m, aes(x=date, y=value, color=variable)) +
+      geom_line() +
+      ylab("Number of pneumonia deaths") +
+      xlab("Date") +
+      theme_classic() +
+      geom_hline(yintercept=0, col='black', lty=1) +
+      scale_color_manual(values = c("#e41a1c", "#377eb8","#4daf4a","#984ea3"))
+p1
+```
+
+Separate axes for each
+```{r}
+p2 <- ggplot(ds1.m, aes(x=date, y=value, color=variable)) +
+      geom_line() +
+      ylab("Number of pneumonia deaths") +
+      xlab("Date") +
+      theme_classic() +
+      geom_hline(yintercept=0, col='black', lty=1) +
+      facet_wrap(~variable , scales='free') +
+      theme(panel.spacing= unit(2,'lines') , axis.text.x=element_text(angle=90)) 
+p2
+```
+
+
 
 
 ## Setup variables needed for interrupted time series (ITS) model
@@ -126,21 +140,15 @@ ds1$log_pop <- log(ds1$mppop)
 ```
 
 ```{r}
-# Visualize these three post periods
-par(mfrow=c(1,1))
-plot(clpneumonia ~ date, data=ds1, type="l", col="black", bty="l", main="Various definitions of pneumonia", ylab="Counts", ylim=c(0,max(clpneumonia)))
-lines(epc ~ date, data=ds1, col="blue")
-lines(clpnhypox ~ date, data=ds1, col="orange")
-lines(spnpneumonia ~ date, data=ds1, col="red")
-#legend(x="topright",legend = c("Clinical","X-ray","Hypoxic","Pneumococcal"), lty=c(1,1,1,1), col=c("black","blue","orange","red"), bty="n", cex=0.8)
-abline(v=as.Date(c('2009-08-01','2010-08-01',"2012-05-01")), lty=2)
-text(x=as.Date("2008-10-01"),y=420,"Pre", col="darkgreen")
-text(x=as.Date("2010-02-01"),y=420,"Post 1", col="darkgreen")
-text(x=as.Date("2011-07-01"),y=420,"Post 2", col="darkgreen")
-text(x=as.Date("2015-01-01"),y=420,"Post 3", col="darkgreen")
-text(x=as.Date("2009-08-01"),y=350,"PCV7", col="red")
-text(x=as.Date("2012-05-01"),y=350,"PCV13", col="red")
+# Visualize the period when PCV7 and then PCV13 were introduced
 
+
+
+p2.lab <-p2 +  geom_vline(xintercept=as.Date(c( "2009-10-01","2012-05-01") ), col='gray', lty=2) +
+
+      scale_color_manual(values = c("#e41a1c", "#377eb8","#4daf4a","#984ea3")) 
+  
+p2.lab
 
 ```
 
@@ -164,45 +172,56 @@ summarize model output
 summary(mod1.epc)
 AIC(mod1.epc)
 
+ds.mod1 <- ds1
 # Model-fitted number of pneumonia cases
-pred1 <- predict(mod1.epc, type='response', newdata=ds1)
+ds.mod1$pred.epc <- predict(mod1.epc, type='response', newdata=ds.mod1)
 ```
 
 generate the counterfactuals
 ```{r}
 # Generate the counterfactual number of pneumonia cases
-ds1.counter <- ds1
+ds1.counter <- ds.mod1
 ds1.counter$post1 <- 0
 ds1.counter$post2 <- 0
 ds1.counter$post3 <- 0
 # View(ds1.counter)
-counterfact1 <- predict(mod1.epc, type='response', newdata=ds1.counter) # newdata is now "ds1.counter"
+
+ds.mod1$pred.epc.cf <- predict(mod1.epc, type='response', newdata=ds1.counter) # newdata is now "ds1.counter"
 
 # Calculate a rate ratio (i.e., Ratio of model-fitted vs. counterfactual number of pneumonia cases)
-rr1 <- pred1/counterfact1
+ds.mod1$rr1.epc <- ds.mod1$pred.epc / ds.mod1$pred.epc.cf 
 
 ```
 
 Plot the model fit
 ```{r}
-# Plot: Observed vs. Model-fitted vs. Counterfactual
-par(mfrow=c(1,1))
-plot(epc ~ date, data=ds1, bty='l', type="p", pch=16, col="grey", xlab="", ylab="Counts", main="X-ray confirmed pneumonia", ylim=c(0,max(epc)))
-lines(ds1$date, pred1, col='black')
-lines(ds1$date, counterfact1, col='red')
-abline(v=as.Date(c('2009-08-01','2010-08-01',"2012-05-01")), lty=2)
-legend(x=as.Date("2015-11-01"),y=53,c("Observed", "Model-fitted", "Counterfactual"), pch = c(16,NA,NA), lty = c(NA,1,1), col=c("darkgrey","black","red"), cex=0.6)
 
-# Adjust the range of y axis...
-plot(epc ~ date, data=ds1, bty='l', type="p", pch=16, col="grey", xlab="", ylab="Counts", main="X-ray confirmed pneumonia", ylim=c(0,max(counterfact1)))
-lines(ds1$date, pred1, col='black')
-lines(ds1$date, counterfact1, col='red')
-abline(v=as.Date(c('2009-08-01','2010-08-01',"2012-05-01")), lty=2)
+p4 <- ggplot(ds.mod1, aes(x=date, y=epc)) +
+      geom_point( pch=16,col='gray') +
+      ylab("Number of pneumonia deaths") +
+      xlab("Date") +
+      theme_classic() +
+      geom_line(data=ds.mod1, aes(x=date, y=pred.epc), col='black', lty=2) +
+      geom_line(data=ds.mod1, aes(x=date, y=pred.epc.cf), col='red', lty=2) +
+      ylim(0, max(ds.mod1$epc))+
+      geom_hline(yintercept=0, col='black', lty=1) 
+p4
 
-# Plot: Rate ratio (Model-fitted / Counterfactual) 
-plot(rr1 ~ date, data=ds1, bty='l', type='l', main="Rate ratio (Model-fitted vs. Counterfactual)", ylab="RR", ylim=c(0,2))
-abline(h=1, lty=2, col='darkgray')
-abline(v=as.Date(c('2009-08-01','2010-08-01',"2012-05-01")), lty=2, col="red")
+```
+
+ Plot: Rate ratio (Model-fitted / Counterfactual) 
+
+```{r}
+p4.rr <- ggplot(ds.mod1, aes(x=date, y=rr1.epc)) +
+      geom_line( col='gray') +
+      ylab("RR") +
+      xlab("Date") +
+      theme_classic() +
+      labs(title="Rate ratio (Model-fitted vs. Counterfactual)")+
+        geom_hline(yintercept=0, col='black', lty=1) +
+geom_vline(xintercept=as.Date(c('2009-08-01','2010-08-01',"2012-05-01")), col='red', lty=2)
+p4.rr
+
 ```
 
 This counterfactual (red line in the plot) looks kind of crazy. Part of the problem is that we only have 1 year of pre vaccine data so can't really get a good estimate of the long-term trend. 
@@ -222,38 +241,58 @@ mod2.epc <- glm.nb(epc ~ month +
 # Model summary
 summary(mod2.epc)
 AIC(mod1.epc, mod2.epc)
+```
 
+Generate fitted value and counterfactual
+```{r}
 # Model-fitted
-pred1 <- predict(mod2.epc, type='response', newdata=ds1)
+ds.mod2 <- ds1
+
+ds.mod2$pred.epc <- predict(mod2.epc, type='response', newdata=ds1)
 
 # Counterfactual
-ds1.counter <- ds1
+ds1.counter <- ds.mod2
 ds1.counter$post1 <- 0
 ds1.counter$post2 <- 0
 ds1.counter$post3 <- 0
-counterfact1 <- predict(mod2.epc, type='response', newdata=ds1.counter)
+ds.mod2$pred.epc.cf <- predict(mod2.epc, type='response', newdata=ds1.counter)
 
 # Rate ratio
-rr1 <- pred1/counterfact1
+ds.mod2$rr2 <- ds.mod2$pred.epc/ds.mod2$pred.epc.cf
+```
 
-# Plot: 
-par(mfrow=c(1,1))
-plot(epc ~ date, data=ds1, bty='l', type="p", pch=16, col="grey", xlab="", ylab="Counts", main="X-ray confirmed pneumonia", ylim=c(0,max(epc)))
-lines(ds1$date, pred1, col='black')
-lines(ds1$date, counterfact1, col='red')
-abline(v=as.Date(c('2009-08-01','2010-08-01',"2012-05-01")), lty=2)
-legend(x=as.Date("2015-11-01"),y=53,c("Observed", "Model-fitted", "Counterfactual"), pch = c(16,NA,NA), lty = c(NA,1,1), col=c("darkgrey","black","red"), cex=0.6)
+Plot the model fit
+```{r}
 
-# Plot: Rate ratio (Model-fitted / Counterfactual) 
-plot(rr1 ~ date, data=ds1, bty='l', type='l', main="Rate ratio (Model-fitted vs. Counterfactual)", ylab="RR", ylim=c(0,2))
-abline(h=1, lty=2, col='darkgray')
-abline(v=as.Date(c('2009-08-01','2010-08-01',"2012-05-01")), lty=2, col="red")
+p5 <- ggplot(ds.mod2, aes(x=date, y=epc)) +
+      geom_point( pch=16,col='gray') +
+      ylab("Number of pneumonia deaths") +
+      xlab("Date") +
+      theme_classic() +
+      geom_line(data=ds.mod2, aes(x=date, y=pred.epc), col='black', lty=2) +
+      geom_line(data=ds.mod2, aes(x=date, y=pred.epc.cf), col='red', lty=2) +
+      ylim(0, max(ds.mod2$epc))+
+      geom_hline(yintercept=0, col='black', lty=1) 
+p5
+
+```
+And the RR 
+
+```{r}
+p5.rr <- ggplot(ds.mod2, aes(x=date, y=rr2)) +
+      geom_line( col='gray') +
+      ylab("RR") +
+      xlab("Date") +
+      theme_classic() +
+      labs(title="Rate ratio (Model-fitted vs. Counterfactual)")+
+        geom_hline(yintercept=0, col='black', lty=1) +
+geom_vline(xintercept=as.Date(c('2009-08-01','2010-08-01',"2012-05-01")), col='red', lty=2)
+p5.rr
 
 ```
 
 The AIC score is not notably different than the model with the interactions, and it looks a lot cleaner. 
 
-The p values for the post-vaccine dummy variables are not signifcant (other than post2), so we might conclude from the regression coefficients that there is no change associated with the vaccine, and if anything the plots suggest disease rates were going up for radiological pneumonia following vaccine introduction. 
 
 ## Other things we could think about
 
@@ -288,24 +327,28 @@ time_points1 <- unique(ds1$date)
 
 # 5 models controllling for different sets of covariates
 # NOTE: all models control for seasonality (by monthly dummy variables) and population (offset)
-mod1a <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='pois', other.covars='none')
-mod1b <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='pois', other.covars='xray')
-mod1c <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='pois', other.covars=c('xray','time_index'))
-mod1d <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='pois', other.covars=c('bronchiol','time_index') )
-mod1e <- spline_func(ds=ds1,outcome_name='epc', denom='mppop',other.covars= c('xray'), mod='pois' )
+
+mod1a <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='negbin', other.covars='none')
+
+mod1b <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='negbin', other.covars='xray')
+
+mod1c <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='negbin', other.covars=c('xray','time_index'))
+
+mod1d <- step_func(ds=ds1, outcome_name='epc', denom='mppop', mod='negbin', other.covars=c('bronchiol','time_index') )
+
+mod1e <- spline_func(ds=ds1,outcome_name='epc', denom='mppop',other.covars= c('xray'), mod='negbin' )
 
 # Extract results
 rr <- t(sapply(list(mod1a,mod1b, mod1c,mod1d,mod1e), '[[','rr.q.post'))
 rr
 aic <- t(sapply(list(mod1a,mod1b, mod1c,mod1d,mod1e), '[[','aic1'))
 aic
-dispersion <- t(sapply(list(mod1a,mod1b, mod1c,mod1d,mod1e), '[[','overdispersion'))
-dispersion
+#dispersion <- t(sapply(list(mod1a,mod1b, mod1c,mod1d,mod1e), '[[','overdispersion'))
+#dispersion
 ```
 
-This suggests that the best model by AIC adjusts for XRays. 
+This suggests that the best model by AIC adjusts for XRays. Models 1b,c,e are similar by AIC, all give similar RR estimates We are using a negative binomial model here
 
-The dispersion tells us whether the Poisson model is appropriate. If numbers close to 1, then stick with Poisson. If it is >>1, then go with negative binimoal (change to mod='negbin' in the function). In this instance it doesn't make a big difference (get slightly wider CIs with negative binomial).
 
 
 ```{r}
@@ -327,7 +370,7 @@ dispersion <- t(sapply(list(mod2a,mod2b, mod2c,mod2d,mod2e), '[[','overdispersio
 dispersion
 ```
 
-Suggests best model is the one that adjusts for pneumococcal pneumonia (pcv13st is a subset of pneumococcal pneumonia). So we are effectively testing whether pneumonia caused by PCV13 serotypes declines in relation to the overall change in pneumococcal pneumonia. We can stick with Poisson here.
+Model E does best--adjusts for pneumococcal pneumonia (pcv13st is a subset of pneumococcal pneumonia). So we are effectively testing whether pneumonia caused by PCV13 serotypes declines in relation to the overall change in pneumococcal pneumonia. We can stick with Poisson model here.
 
 
 ```{r}
@@ -335,10 +378,10 @@ Suggests best model is the one that adjusts for pneumococcal pneumonia (pcv13st 
 # spnpneumonia (Pneumococcal pneumonia)
 #-----*-----*-----*-----*-----*-----*-----*-----*-----#
 
-mod3a <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='pois')
-mod3b <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='pois', other.covars='xray' )
-mod3c <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='pois', other.covars= c('time_index'))
-mod3d <- spline_func(ds=ds1,outcome_name='spnpneumonia', denom='mppop', mod='pois', other.covars= c('xray'))
+mod3a <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='negbin')
+mod3b <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='negbin', other.covars='xray' )
+mod3c <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='negbin', other.covars= c('time_index'))
+mod3d <- spline_func(ds=ds1,outcome_name='spnpneumonia', denom='mppop', mod='negbin', other.covars= c('xray'))
 
 rr <- t(sapply(list(mod3a,mod3b, mod3c,mod3d), '[[','rr.q.post'))
 rr
@@ -356,10 +399,10 @@ mod3c and mod3d are the best models.
 # clpnhypox (Hypoxic pneumonia)
 #-----*-----*-----*-----*-----*-----*-----*-----*-----#
 
-mod4a<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='pois')
-mod4b<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='pois', other.covars='xray')
-mod4c<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='pois', other.covars='time_index')
-mod4d<-spline_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='pois', other.covars='xray')
+mod4a<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='negbin')
+mod4b<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='negbin', other.covars='xray')
+mod4c<-step_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='negbin', other.covars='time_index')
+mod4d<-spline_func(ds=ds1,outcome_name='clpnhypox', denom='mppop', mod='negbin', other.covars='xray')
 
 rr<-t(sapply(list(mod4a, mod4b, mod4c, mod4d), '[[','rr.q.post'))
 rr
@@ -368,9 +411,7 @@ aic
 dispersion<-t(sapply(list(mod4a,mod4b, mod4c,mod4d), '[[','overdispersion'))
 dispersion
 ```
-
-The spline model, which connects post-vaccine periods with connected line sgements is the best. 
-
+4d: Spline model adjusting for xrays best
 
 ```{r}
 #-----*-----*-----*-----*-----*-----*-----*-----*-----#
@@ -390,7 +431,7 @@ dispersion<-t(sapply(list(mod5a,mod5b, mod5c,mod5d), '[[','overdispersion'))
 dispersion
 ```
 
-Best model adjusts for Xrays and uses linear splines to connect post vaccine periods. The best model is not overdiserpsed, so stick with Poisson. (mod5a and mod5c are clearly overdispersed, so we can try negative binomial.)
+Best model adjusts for Xrays and uses spline functions to connect post vaccine periods. The best model is not overdiserpsed, so stick with Poisson. (mod5a and mod5c are clearly overdispersed, so we can try negative binomial.)
 
 ## RRs by the best model for each outcome
 
@@ -398,7 +439,7 @@ Select the best model (by AIC) for each of these. We are going to ignore the mod
 
 ```{r}
 # Select the best model for each outcome
-best.models <- list(mod1e, mod2e, mod3d, mod4d, mod5d)
+best.models <- list(mod1e, mod2e, mod3d, mod4b, mod5b)
 
 # Create a table of RRs generated by the "best" model
 rr.all <- round(t(sapply(best.models, '[[','rr.q.post')),2)
