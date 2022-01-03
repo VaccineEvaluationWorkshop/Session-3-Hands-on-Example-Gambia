@@ -30,7 +30,7 @@ library(ggplot2)
 
 ## Note on the data
 
-The data we will be using today were collected as part of surveillance activities by the Medical Research Council (MRC) in The Gambia. They were shared by Dr. Grant MacKenzie and should not be re-used outside of this material without his written permission (gmackenzie@mrc.gm).
+The data we will be using today were collected as part of surveillance activities by the Medical Research Council (MRC) in The Gambia. They were shared by Dr. Grant MacKenzie and should not be re-used outside of this material without his written permission (gmackenzie@mrc.gm). The analyses here were developed by Dr. Nuredin Mohammed in collaboration with Dan Weinberger
 
 ## Today's goal
 
