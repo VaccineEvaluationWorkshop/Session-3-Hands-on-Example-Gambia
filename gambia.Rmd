@@ -58,9 +58,11 @@ names(ds1)
 str(ds1)
 ```
 
-Declare the date variable as a date
+Declare the date variable as a date and sort
 ```{r}
 ds1$date <- as.Date(ds1$date)
+
+ds1 <- ds1[order(ds1$date),]
 ```
 
 Dictionary: 
@@ -108,7 +110,9 @@ p2 <- ggplot(ds1.m, aes(x=date, y=value, color=variable)) +
       theme_classic() +
       geom_hline(yintercept=0, col='black', lty=1) +
       facet_wrap(~variable , scales='free') +
-      theme(panel.spacing= unit(2,'lines') , axis.text.x=element_text(angle=90)) 
+      theme(panel.spacing= unit(2,'lines') , axis.text.x=element_text(angle=90)) +
+  geom_vline(xintercept=as.Date(c( "2009-10-01","2012-05-01") ), col='gray', lty=2) +
+      scale_color_manual(values = c("#e41a1c", "#377eb8","#4daf4a","#984ea3")) 
 p2
 ```
 
@@ -139,18 +143,6 @@ ds1$post3[ds1$date >= "2012-05-01"] <- 1 # Post-PCV13
 ds1$log_pop <- log(ds1$mppop)
 ```
 
-```{r}
-# Visualize the period when PCV7 and then PCV13 were introduced
-
-
-
-p2.lab <-p2 +  geom_vline(xintercept=as.Date(c( "2009-10-01","2012-05-01") ), col='gray', lty=2) +
-
-      scale_color_manual(values = c("#e41a1c", "#377eb8","#4daf4a","#984ea3")) 
-  
-p2.lab
-
-```
 
 ## ITS with time index variable, dummy variables for post periods, and their interactions
 
@@ -291,7 +283,7 @@ p5.rr
 
 ```
 
-The AIC score is not notably different than the model with the interactions, and it looks a lot cleaner. 
+The AIC score is not notably different than the model with the interactions, and it looks a lot cleaner. We typically will prefer the simpler model. 
 
 
 ## Other things we could think about
@@ -341,6 +333,7 @@ mod1e <- spline_func(ds=ds1,outcome_name='epc', denom='mppop',other.covars= c('x
 # Extract results
 rr <- t(sapply(list(mod1a,mod1b, mod1c,mod1d,mod1e), '[[','rr.q.post'))
 rr
+
 aic <- t(sapply(list(mod1a,mod1b, mod1c,mod1d,mod1e), '[[','aic1'))
 aic
 #dispersion <- t(sapply(list(mod1a,mod1b, mod1c,mod1d,mod1e), '[[','overdispersion'))
@@ -378,15 +371,16 @@ Model E does best--adjusts for pneumococcal pneumonia (pcv13st is a subset of pn
 # spnpneumonia (Pneumococcal pneumonia)
 #-----*-----*-----*-----*-----*-----*-----*-----*-----#
 
-mod3a <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='negbin')
-mod3b <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='negbin', other.covars='xray' )
-mod3c <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='negbin', other.covars= c('time_index'))
-mod3d <- spline_func(ds=ds1,outcome_name='spnpneumonia', denom='mppop', mod='negbin', other.covars= c('xray'))
+mod3a <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='pois')
+mod3b <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='pois', other.covars='xray' )
+mod3c <- step_func(ds=ds1, outcome_name='spnpneumonia', denom='mppop', mod='pois', other.covars= c('time_index'))
+mod3d <- spline_func(ds=ds1,outcome_name='spnpneumonia', denom='mppop', mod='pois', other.covars= c('xray'))
 
 rr <- t(sapply(list(mod3a,mod3b, mod3c,mod3d), '[[','rr.q.post'))
 rr
 aic <- t(sapply(list(mod3a,mod3b, mod3c,mod3d), '[[','aic1'))
 aic
+
 dispersion <- t(sapply(list(mod3a,mod3b, mod3c,mod3d), '[[','overdispersion'))
 dispersion
 ```
