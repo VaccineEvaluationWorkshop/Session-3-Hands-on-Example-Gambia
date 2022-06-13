@@ -23,11 +23,11 @@ step_func <- function(ds,
   ds$sin6<-sin(2*pi* ds$time_index/6)
   ds$cos6<-cos(2*pi* ds$time_index/6)
   ds$month<-month(ds$date)
-  #month.dummies<-as.data.frame(dummies::dummy(ds$month))[,1:11]
-  month.dummies <- model.matrix(~ as.factor(month), data=ds)
-  month.dummies <- as.data.frame(month.dummies[,-1])
-  names(month.dummies) <- paste0('month', 2:(ncol(month.dummies)+1))
-
+  
+  ds$month <-as.factor(ds$month)
+  month.dummies <- as.data.frame(model.matrix(~month, data=ds))
+  month.dummies <- month.dummies[,-1]
+  
   ds$one<-1
   
   ds<-cbind.data.frame(ds, month.dummies)
@@ -35,7 +35,7 @@ step_func <- function(ds,
   ds$obs <- as.factor(1:nrow(ds))
   ds$log.offset<-log(ds[,denom]+0.5)
   
-  seas.vars<- c(names(month.dummies) )
+  seas.vars<- c(names(as.data.frame(month.dummies) ))
   offset.vars<-'offset(log.offset)'
   if((other.covars=='none')[1]){
     mod.vars<-c(seas.vars,vax.vars)
@@ -69,7 +69,6 @@ step_func <- function(ds,
   deviance1<-summary(mod1)$deviance
   df1<-summary(mod1)$df[2]
   overdispersion<-deviance1/df1
-  
   #GENERATE PREDICTIONS
   covars3 <-
     as.matrix(cbind(ds[, mod.vars])) 
@@ -108,7 +107,7 @@ step_func <- function(ds,
   rr.q.post <- quantile(rr.post, probs = c(0.025, 0.5, 0.975))
   
   rr.out <- list('rr.q.post' = rr.q.post, 'aic1'=aic1,'outcome'=ds[,outcome_name],
-                 'preds.cf.q'=preds.cf.q,'preds.q'=preds.q,
+                 'preds.cf.q'=preds.cf.q,'preds.q'=preds.q,'form1'=form1,
                  'rr.q.t'=rr.q.t,'overdispersion'=overdispersion, 'dates'=ds$date)
   return(rr.out)
 }
@@ -161,13 +160,13 @@ spline_func <- function(ds,
   ds$sin6<-sin(2*pi* ds$time_index/6)
   ds$cos6<-cos(2*pi* ds$time_index/6)
   ds$month<-month(ds$date)
+  
+  
  # month.dummies<-as.data.frame(dummies::dummy(ds$month))[,1:11]
   
-  #month.dummies<-as.data.frame(dummies::dummy(ds$month))[,1:11]
-  month.dummies <- model.matrix(~ as.factor(month), data=ds)
-  month.dummies <- as.data.frame(month.dummies[,-1])
-  names(month.dummies) <- paste0('month', 2:(ncol(month.dummies)+1))
-
+  ds$month <-as.factor(ds$month)
+  month.dummies <- as.data.frame(model.matrix(~month, data=ds))
+  month.dummies <- month.dummies[,-1]
   
   ds$one<-1
   ds<-cbind.data.frame(ds, month.dummies)
@@ -175,7 +174,7 @@ spline_func <- function(ds,
   ds$obs <- as.factor(1:nrow(ds))
   ds$log.offset<-log(ds[,denom]+0.5)
   
-  seas.vars<- c(names(month.dummies) )
+  seas.vars<- c(names(as.data.frame(month.dummies) ))
   offset.vars<-'offset(log.offset)'
   if((other.covars=='none')[1]){
     mod.vars<-c(seas.vars,vax.vars)
@@ -244,7 +243,7 @@ spline_func <- function(ds,
   rr.q.post <- quantile(rr.post, probs = c(0.025, 0.5, 0.975))
   
   rr.out <- list('rr.q.post' = rr.q.post, 'aic1'=aic1,'outcome'=ds[,outcome_name],
-                 'preds.cf.q'=preds.cf.q,'preds.q'=preds.q,
+                 'preds.cf.q'=preds.cf.q,'preds.q'=preds.q, 'form1'=form1,
                  'rr.q.t'=rr.q.t,'overdispersion'=overdispersion, 'dates'=ds$date)
   return(rr.out)
 }
@@ -261,4 +260,3 @@ spline_func <- function(ds,
 #   points(time_points1,ds$rr.q.t[,'97.5%'], lty=2, col='gray', type='l')
 #   abline(h=1, lty=2, col='gray')
 # }
-
